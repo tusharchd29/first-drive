@@ -100,7 +100,8 @@ export function updateCarPhysics(
   next.handbrake = inputs.handbrake;
 
   // --- Handle gear change ---
-  if (inputs.gear !== state.gear && inputs.clutch > 80) {
+  // Allow gear change when clutch pressed >65% OR engine is off
+  if (inputs.gear !== state.gear && (inputs.clutch > 65 || !state.engineOn)) {
     next.gear = inputs.gear;
   }
 
@@ -170,11 +171,13 @@ export function updateCarPhysics(
     }
   }
 
-  if (inputs.startEngine && state.isStalled) {
+  // Restart after stall — require clutch to be pressed first
+  if (inputs.startEngine && (state.isStalled || !state.engineOn)) {
     next.isStalled = false;
     next.engineOn = true;
     next.rpm = IDLE_RPM;
-    next.gear = 0;
+    next.gear = 0;  // drop to neutral on restart
+    next.engineSound = 'idle';
   }
 
   // --- Force / acceleration calculation ---

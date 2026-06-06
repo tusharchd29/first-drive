@@ -145,17 +145,7 @@ export function GameScreen({ phase }: { phase: GamePhase }) {
           </div>
         </div>
 
-        {/* Stall counter */}
-        {car.stallCount > 0 && (
-          <div
-            className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1"
-            style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid #ef444440' }}
-          >
-            <span className="text-[#ef4444] text-[11px] font-bold">
-              ⚠️ {car.stallCount} stall{car.stallCount !== 1 ? 's' : ''}
-            </span>
-          </div>
-        )}
+
       </div>
 
       {/* Gauges */}
@@ -176,7 +166,7 @@ export function GameScreen({ phase }: { phase: GamePhase }) {
         onThrottle={(v) => updateInputs({ throttle: v })}
         onSteering={(v) => updateInputs({ steering: v })}
         onGear={(g) => updateInputs({ gear: g })}
-        onStart={() => updateInputs({ startEngine: true })}
+        onStart={() => { updateInputs({ startEngine: true }); setTimeout(() => updateInputs({ startEngine: false }), 150); }}
         engineOn={car.engineOn}
         isStalled={car.isStalled}
       />
