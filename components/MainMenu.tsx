@@ -1,142 +1,68 @@
 'use client';
-
 import React from 'react';
 import { GamePhase } from '../lib/gameStore';
 
-interface MenuProps {
-  onSelect: (phase: GamePhase) => void;
-}
-
-const MENU_ITEMS = [
-  {
-    phase: 'lesson_1' as GamePhase,
-    title: 'Lesson 1',
-    subtitle: 'Find the Bite Point',
-    desc: 'Learn the clutch from scratch. Empty parking lot.',
-    icon: '🅿️',
-    color: '#22d3ee',
-    tag: 'BEGINNER',
-  },
-  {
-    phase: 'stall_challenge' as GamePhase,
-    title: 'Stall Challenge',
-    subtitle: 'Hill Start & Stop-Go',
-    desc: 'Purposeful stalls. Kill the fear. Learn recovery.',
-    icon: '⛰️',
-    color: '#f59e0b',
-    tag: 'INTERMEDIATE',
-  },
-  {
-    phase: 'free_drive' as GamePhase,
-    title: 'Free Drive',
-    subtitle: 'Open Town',
-    desc: 'Explore the town. No pressure. Just drive.',
-    icon: '🏙️',
-    color: '#4ade80',
-    tag: 'SANDBOX',
-  },
+const ITEMS = [
+  { phase: 'lesson_1' as GamePhase, title: 'Lesson 1', subtitle: 'Find the Bite Point', desc: 'Empty parking lot. Learn clutch from zero.', icon: '🅿️', color: '#1565c0', tag: 'START HERE' },
+  { phase: 'stall_challenge' as GamePhase, title: 'Stall Challenge', subtitle: 'Hill Start & Recovery', desc: 'Stall on purpose. Remove the fear.', icon: '⛰️', color: '#e65100', tag: 'INTERMEDIATE' },
+  { phase: 'free_drive' as GamePhase, title: 'Free Drive', subtitle: 'Open Town', desc: 'Explore freely. No pressure.', icon: '🏙️', color: '#2e7d32', tag: 'SANDBOX' },
 ];
 
-export function MainMenu({ onSelect }: MenuProps) {
+export function MainMenu({ onSelect }: { onSelect: (p: GamePhase) => void }) {
   return (
-    <div
-      className="absolute inset-0 flex flex-col overflow-hidden"
-      style={{ background: '#080c14' }}
-    >
-      {/* Background decoration */}
-      <div
-        className="absolute inset-0 opacity-20"
-        style={{
-          background: 'radial-gradient(ellipse at 50% 30%, #1a4a7a 0%, transparent 70%)',
-        }}
-      />
-      <div
-        className="absolute bottom-0 left-0 right-0 h-64 opacity-10"
-        style={{
-          background: 'radial-gradient(ellipse at 50% 100%, #22d3ee 0%, transparent 60%)',
-        }}
-      />
-
-      {/* Road lines decoration */}
-      <svg className="absolute bottom-0 left-0 right-0 opacity-5" height="200" style={{ width: '100%' }}>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <line
-            key={i}
-            x1={i * 80 - 20}
-            y1="200"
-            x2={i * 80 + 40}
-            y2="0"
-            stroke="white"
-            strokeWidth="1"
-            strokeDasharray="20 20"
-          />
-        ))}
-      </svg>
-
+    <div style={{ background: '#f5f7fa', minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div className="relative z-10 px-6 pt-14 pb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-2xl">🚗</span>
-          <span
-            className="text-[10px] font-bold tracking-[0.3em] uppercase"
-            style={{ color: '#22d3ee' }}
-          >
-            First Drive
-          </span>
+      <div style={{
+        background: 'white', borderBottom: '1px solid #e8e8e8',
+        padding: '32px 20px 20px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 28 }}>🚗</span>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 3, color: '#1565c0', textTransform: 'uppercase' }}>First Drive</span>
         </div>
-        <h1
-          className="text-4xl font-black leading-tight tracking-tight"
-          style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #22d3ee 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
-        >
-          Learn to Drive<br />a Manual Car
+        <h1 style={{ fontSize: 26, fontWeight: 900, color: '#1a1a1a', margin: 0, lineHeight: 1.2 }}>
+          Learn Manual<br />Driving
         </h1>
-        <p className="text-white/40 text-[12px] mt-2">
-          The only simulator that teaches you the clutch.
+        <p style={{ fontSize: 12, color: '#888', marginTop: 6, marginBottom: 0 }}>
+          Real clutch physics · Instructor AI · No racing
         </p>
       </div>
 
-      {/* Menu items */}
-      <div className="relative z-10 flex-1 px-4 flex flex-col gap-3 overflow-y-auto pb-4">
-        {MENU_ITEMS.map(({ phase, title, subtitle, desc, icon, color, tag }) => (
+      {/* Cards */}
+      <div style={{ flex: 1, padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
+        {ITEMS.map(({ phase, title, subtitle, desc, icon, color, tag }) => (
           <button
             key={phase}
             onClick={() => onSelect(phase)}
-            className="text-left rounded-2xl p-4 transition-all active:scale-98"
             style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: `1px solid ${color}25`,
-              backdropFilter: 'blur(8px)',
+              background: 'white', border: `1.5px solid ${color}30`,
+              borderRadius: 16, padding: '14px 16px',
+              display: 'flex', alignItems: 'center', gap: 14,
+              textAlign: 'left', cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              transition: 'transform 0.1s',
             }}
           >
-            <div className="flex items-start gap-3">
-              <span className="text-3xl flex-shrink-0">{icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-white font-bold text-[14px]">{title}</span>
-                  <span
-                    className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
-                    style={{ background: `${color}20`, color }}
-                  >
-                    {tag}
-                  </span>
-                </div>
-                <div className="font-semibold text-[12px] mb-0.5" style={{ color }}>{subtitle}</div>
-                <p className="text-white/40 text-[11px] leading-snug">{desc}</p>
+            <span style={{ fontSize: 36, flexShrink: 0 }}>{icon}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: '#1a1a1a' }}>{title}</span>
+                <span style={{
+                  fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 10,
+                  background: `${color}15`, color,
+                }}>{tag}</span>
               </div>
-              <span className="text-white/20 text-lg">›</span>
+              <div style={{ fontSize: 12, fontWeight: 600, color, marginBottom: 2 }}>{subtitle}</div>
+              <div style={{ fontSize: 11, color: '#888' }}>{desc}</div>
             </div>
+            <span style={{ color: '#ccc', fontSize: 18 }}>›</span>
           </button>
         ))}
       </div>
 
-      {/* Footer */}
-      <div className="relative z-10 px-4 pb-8 text-center">
-        <p className="text-white/20 text-[10px]">
-          "Duolingo for Manual Driving" • Real clutch physics • No racing
+      <div style={{ padding: '12px 20px 24px', textAlign: 'center' }}>
+        <p style={{ fontSize: 10, color: '#bbb', margin: 0 }}>
+          "Duolingo for Manual Driving" — understand clutch before your first real lesson
         </p>
       </div>
     </div>

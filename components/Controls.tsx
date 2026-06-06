@@ -1,32 +1,25 @@
 'use client';
-
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 
-// ─── Touch ID tracking ────────────────────────────────────────────────────────
-// Each interactive element tracks its own touch identifier so multi-touch works
-
-interface SliderPedalProps {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  color: string;
-  icon: string;
-  releaseToZero?: boolean; // if true, releasing finger snaps back to 0
-}
-
-function SliderPedal({ label, value, onChange, color, icon, releaseToZero = true }: SliderPedalProps) {
+// ─── Slider Pedal (Brake / Gas) ───────────────────────────────────────────────
+function SliderPedal({
+  label, value, onChange, color, icon,
+}: {
+  label: string; value: number; onChange: (v: number) => void;
+  color: string; icon: string;
+}) {
   const trackRef = useRef<HTMLDivElement>(null);
   const touchId = useRef<number | null>(null);
+  const mouseDown = useRef(false);
 
   const getVal = useCallback((clientY: number) => {
     const el = trackRef.current;
     if (!el) return 0;
-    const rect = el.getBoundingClientRect();
-    const pct = 1 - (clientY - rect.top) / rect.height;
-    return Math.max(0, Math.min(100, pct * 100));
+    const r = el.getBoundingClientRect();
+    return Math.max(0, Math.min(100, (1 - (clientY - r.top) / r.height) * 100));
   }, []);
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
+  const onTS = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     if (touchId.current !== null) return;
     const t = e.changedTouches[0];
@@ -34,136 +27,94 @@ function SliderPedal({ label, value, onChange, color, icon, releaseToZero = true
     onChange(getVal(t.clientY));
   }, [onChange, getVal]);
 
-  const onTouchMove = useCallback((e: TouchEvent) => {
+  const onTM = useCallback((e: TouchEvent) => {
     e.preventDefault();
     for (let i = 0; i < e.changedTouches.length; i++) {
       if (e.changedTouches[i].identifier === touchId.current) {
-        onChange(getVal(e.changedTouches[i].clientY));
-        break;
+        onChange(getVal(e.changedTouches[i].clientY)); break;
       }
     }
   }, [onChange, getVal]);
 
-  const onTouchEnd = useCallback((e: TouchEvent) => {
+  const onTE = useCallback((e: TouchEvent) => {
     for (let i = 0; i < e.changedTouches.length; i++) {
       if (e.changedTouches[i].identifier === touchId.current) {
-        touchId.current = null;
-        if (releaseToZero) onChange(0);
-        break;
+        touchId.current = null; onChange(0); break;
       }
     }
-  }, [onChange, releaseToZero]);
+  }, [onChange]);
 
   useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', onTouchEnd);
-    el.addEventListener('touchcancel', onTouchEnd);
-    return () => {
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
-      el.removeEventListener('touchcancel', onTouchEnd);
-    };
-  }, [onTouchMove, onTouchEnd]);
+    const el = trackRef.current; if (!el) return;
+    el.addEventListener('touchmove', onTM, { passive: false });
+    el.addEventListener('touchend', onTE);
+    el.addEventListener('touchcancel', onTE);
+    return () => { el.removeEventListener('touchmove', onTM); el.removeEventListener('touchend', onTE); el.removeEventListener('touchcancel', onTE); };
+  }, [onTM, onTE]);
 
-  // Mouse support (desktop testing)
-  const mouseDown = useRef(false);
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    mouseDown.current = true;
-    onChange(getVal(e.clientY));
+  useEffect(() => {
+    const mv = (e: MouseEvent) => { if (mouseDown.current) onChange(getVal(e.clientY)); };
+    const up = () => { if (mouseDown.current) { mouseDown.current = false; onChange(0); } };
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+    return () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
   }, [onChange, getVal]);
 
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (mouseDown.current) onChange(getVal(e.clientY));
-    };
-    const onUp = () => {
-      if (mouseDown.current) {
-        mouseDown.current = false;
-        if (releaseToZero) onChange(0);
-      }
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-  }, [onChange, getVal, releaseToZero]);
-
-  const isActive = value > 2;
-
+  const active = value > 2;
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-[10px] font-bold tracking-wide" style={{ color: isActive ? color : `${color}66` }}>
-        {label}
-      </span>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <span style={{ fontSize: 9, fontWeight: 700, color: active ? color : '#aaa', letterSpacing: 1 }}>{label}</span>
       <div
         ref={trackRef}
-        className="relative rounded-2xl select-none"
+        onMouseDown={(e) => { mouseDown.current = true; onChange(getVal(e.clientY)); }}
+        onTouchStart={onTS}
         style={{
-          width: 52,
-          height: 120,
-          background: 'rgba(255,255,255,0.04)',
-          border: `2px solid ${isActive ? color : `${color}30`}`,
-          touchAction: 'none',
-          transition: 'border-color 0.1s',
+          width: 48, height: 100,
+          borderRadius: 14,
+          background: '#f5f5f5',
+          border: `2px solid ${active ? color : '#ddd'}`,
+          position: 'relative',
           cursor: 'pointer',
+          touchAction: 'none',
+          overflow: 'hidden',
+          transition: 'border-color 0.1s',
         }}
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart}
       >
-        {/* Fill from bottom */}
-        <div
-          className="absolute bottom-0 left-0 right-0 rounded-xl"
-          style={{
-            height: `${value}%`,
-            background: `linear-gradient(to top, ${color}, ${color}66)`,
-            boxShadow: isActive ? `0 0 12px ${color}50` : 'none',
-            transition: 'box-shadow 0.1s',
-          }}
-        />
-        {/* Icon centered */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 2 }}>
-          <span style={{ fontSize: 22 }}>{icon}</span>
-        </div>
-        {/* Value */}
-        <div
-          className="absolute bottom-1 left-0 right-0 text-center text-[10px] font-black pointer-events-none"
-          style={{ color: isActive ? color : `${color}50`, zIndex: 3 }}
-        >
-          {Math.round(value)}
-        </div>
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          height: `${value}%`,
+          background: `linear-gradient(to top, ${color}, ${color}88)`,
+          borderRadius: 12,
+          boxShadow: active ? `0 0 8px ${color}60` : 'none',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20, zIndex: 2,
+        }}>{icon}</div>
+        <div style={{
+          position: 'absolute', bottom: 3, left: 0, right: 0,
+          textAlign: 'center', fontSize: 9, fontWeight: 700,
+          color: active ? 'white' : '#bbb', zIndex: 3,
+        }}>{Math.round(value)}</div>
       </div>
     </div>
   );
 }
 
 // ─── Clutch Pedal ─────────────────────────────────────────────────────────────
-// Drag DOWN to press clutch (like a real pedal)
-// Stays where you leave it (no spring return) — you control the release
-
-interface ClutchPedalProps {
-  value: number;  // 0=released, 100=fully pressed
-  onChange: (v: number) => void;
-}
-
-function ClutchPedal({ value, onChange }: ClutchPedalProps) {
+function ClutchPedal({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const touchId = useRef<number | null>(null);
   const mouseDown = useRef(false);
 
+  // value 0=released, 100=fully pressed; drag from top=pressed
   const getVal = useCallback((clientY: number) => {
-    const el = trackRef.current;
-    if (!el) return value;
-    const rect = el.getBoundingClientRect();
-    // drag from top=pressed(100) to bottom=released(0)
-    const pct = (clientY - rect.top) / rect.height;
-    return Math.max(0, Math.min(100, pct * 100));
+    const el = trackRef.current; if (!el) return value;
+    const r = el.getBoundingClientRect();
+    return Math.max(0, Math.min(100, ((clientY - r.top) / r.height) * 100));
   }, [value]);
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
+  const onTS = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     if (touchId.current !== null) return;
     const t = e.changedTouches[0];
@@ -171,296 +122,182 @@ function ClutchPedal({ value, onChange }: ClutchPedalProps) {
     onChange(getVal(t.clientY));
   }, [onChange, getVal]);
 
-  const onTouchMove = useCallback((e: TouchEvent) => {
+  const onTM = useCallback((e: TouchEvent) => {
     e.preventDefault();
     for (let i = 0; i < e.changedTouches.length; i++) {
       if (e.changedTouches[i].identifier === touchId.current) {
-        onChange(getVal(e.changedTouches[i].clientY));
-        break;
+        onChange(getVal(e.changedTouches[i].clientY)); break;
       }
     }
   }, [onChange, getVal]);
 
-  const onTouchEnd = useCallback((e: TouchEvent) => {
+  const onTE = useCallback((e: TouchEvent) => {
     for (let i = 0; i < e.changedTouches.length; i++) {
       if (e.changedTouches[i].identifier === touchId.current) {
-        touchId.current = null;
-        // NO snap-back — clutch stays where released (intentional)
-        break;
+        touchId.current = null; break; // no snap
       }
     }
   }, []);
 
   useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', onTouchEnd);
-    el.addEventListener('touchcancel', onTouchEnd);
-    return () => {
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
-      el.removeEventListener('touchcancel', onTouchEnd);
-    };
-  }, [onTouchMove, onTouchEnd]);
+    const el = trackRef.current; if (!el) return;
+    el.addEventListener('touchmove', onTM, { passive: false });
+    el.addEventListener('touchend', onTE);
+    el.addEventListener('touchcancel', onTE);
+    return () => { el.removeEventListener('touchmove', onTM); el.removeEventListener('touchend', onTE); el.removeEventListener('touchcancel', onTE); };
+  }, [onTM, onTE]);
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (mouseDown.current) onChange(getVal(e.clientY));
-    };
-    const onUp = () => { mouseDown.current = false; };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
+    const mv = (e: MouseEvent) => { if (mouseDown.current) onChange(getVal(e.clientY)); };
+    const up = () => { mouseDown.current = false; };
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+    return () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
   }, [onChange, getVal]);
 
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    mouseDown.current = true;
-    onChange(getVal(e.clientY));
-  }, [onChange, getVal]);
-
-  // 0=released, 100=fully pressed
-  // Bite zone is 38–62% pressed
   const inBite = value >= 38 && value <= 62;
-  const isPressed = value > 70;
-  const color = inBite ? '#f59e0b' : isPressed ? '#4ade80' : '#94a3b8';
+  const pressed = value > 65;
+  const color = inBite ? '#e65100' : pressed ? '#2e7d32' : '#1565c0';
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-[10px] font-bold tracking-wide" style={{ color }}>
-        CLUTCH
-      </span>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <span style={{ fontSize: 9, fontWeight: 700, color, letterSpacing: 1 }}>CLUTCH</span>
       <div
         ref={trackRef}
-        className="relative rounded-2xl select-none overflow-hidden"
+        onMouseDown={(e) => { mouseDown.current = true; onChange(getVal(e.clientY)); }}
+        onTouchStart={onTS}
         style={{
-          width: 52,
-          height: 120,
-          background: 'rgba(255,255,255,0.04)',
-          border: `2px solid ${color}60`,
-          touchAction: 'none',
-          transition: 'border-color 0.1s',
+          width: 48, height: 100,
+          borderRadius: 14,
+          background: '#f0f4ff',
+          border: `2px solid ${inBite ? '#ff6d00' : pressed ? '#2e7d32' : '#90caf9'}`,
+          position: 'relative',
           cursor: 'pointer',
+          touchAction: 'none',
+          overflow: 'hidden',
+          transition: 'border-color 0.1s',
         }}
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart}
       >
         {/* Bite zone band */}
-        <div
-          className="absolute left-0 right-0"
-          style={{
-            top: '38%',
-            height: '24%',
-            background: '#f59e0b12',
-            borderTop: '1px dashed #f59e0b50',
-            borderBottom: '1px dashed #f59e0b50',
-            zIndex: 1,
-          }}
-        />
-
-        {/* Fill indicator — shows how far clutch is pressed (from top) */}
-        <div
-          className="absolute top-0 left-0 right-0"
-          style={{
-            height: `${value}%`,
-            background: `linear-gradient(to bottom, ${color}, ${color}44)`,
-            boxShadow: inBite ? `0 0 14px ${color}70` : 'none',
-            transition: 'box-shadow 0.1s',
-            zIndex: 0,
-          }}
-        />
-
-        {/* Drag handle indicator */}
-        <div
-          className="absolute left-0 right-0 flex justify-center"
-          style={{
-            top: `${value}%`,
-            transform: 'translateY(-50%)',
-            zIndex: 4,
-          }}
-        >
-          <div
-            style={{
-              width: 36,
-              height: 4,
-              borderRadius: 2,
-              background: color,
-              boxShadow: `0 0 6px ${color}`,
-            }}
-          />
-        </div>
-
-        {/* Icon */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 3 }}>
-          <span style={{ fontSize: 22, opacity: 0.6 }}>🦶</span>
-        </div>
-
-        {/* Bite label */}
+        <div style={{
+          position: 'absolute', left: 0, right: 0,
+          top: '38%', height: '24%',
+          background: '#ff6d0015',
+          borderTop: '1.5px dashed #ff6d0060',
+          borderBottom: '1.5px dashed #ff6d0060',
+          zIndex: 1,
+        }} />
+        {/* Fill from top */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          height: `${value}%`,
+          background: `linear-gradient(to bottom, ${color}, ${color}66)`,
+          boxShadow: inBite ? `0 4px 12px ${color}50` : 'none',
+          transition: 'box-shadow 0.1s',
+        }} />
+        {/* Drag handle */}
+        <div style={{
+          position: 'absolute', left: 6, right: 6,
+          top: `${value}%`, transform: 'translateY(-50%)',
+          height: 4, borderRadius: 2,
+          background: color,
+          boxShadow: `0 0 4px ${color}`,
+          zIndex: 4,
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20, zIndex: 3, opacity: 0.5,
+        }}>🦶</div>
         {inBite && (
-          <div
-            className="absolute bottom-1 left-0 right-0 text-center text-[9px] font-black animate-pulse pointer-events-none"
-            style={{ color: '#f59e0b', zIndex: 5 }}
-          >
-            ✦ BITE
-          </div>
-        )}
-
-        {/* Press % */}
-        {!inBite && (
-          <div
-            className="absolute bottom-1 left-0 right-0 text-center text-[10px] font-bold pointer-events-none"
-            style={{ color: `${color}80`, zIndex: 5 }}
-          >
-            {Math.round(value)}
-          </div>
+          <div style={{
+            position: 'absolute', bottom: 3, left: 0, right: 0,
+            textAlign: 'center', fontSize: 8, fontWeight: 900,
+            color: '#e65100', zIndex: 5,
+            animation: 'pulse 1s infinite',
+          }}>✦ BITE</div>
         )}
       </div>
-      {/* Hint */}
-      <span className="text-[8px] text-white/30">
-        {value < 10 ? 'Released' : isPressed ? 'Pressed' : inBite ? '↕ Bite zone' : 'Drag ↕'}
+      <span style={{ fontSize: 8, color: '#aaa' }}>
+        {value < 5 ? 'Released' : pressed ? 'Pressed ✓' : inBite ? 'Bite zone' : `${Math.round(value)}%`}
       </span>
     </div>
   );
 }
 
 // ─── Steering ─────────────────────────────────────────────────────────────────
-// Simple hold-L / hold-R buttons. Much more usable than swipe wheel.
+function SteeringControls({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const leftRef = useRef<number | null>(null);
+  const rightRef = useRef<number | null>(null);
 
-interface SteeringProps {
-  value: number;
-  onChange: (v: number) => void;
-}
-
-function SteeringControls({ value, onChange }: SteeringProps) {
-  const leftTouchId = useRef<number | null>(null);
-  const rightTouchId = useRef<number | null>(null);
-
-  const handleLeft = useCallback((active: boolean, identifier?: number) => {
-    if (active) {
-      leftTouchId.current = identifier ?? -1;
-      onChange(-1);
-    } else {
-      leftTouchId.current = null;
-      if (rightTouchId.current === null) onChange(0);
-    }
+  const L = useCallback((on: boolean, id?: number) => {
+    leftRef.current = on ? (id ?? -1) : null;
+    onChange(on ? -1 : rightRef.current !== null ? 1 : 0);
+  }, [onChange]);
+  const R = useCallback((on: boolean, id?: number) => {
+    rightRef.current = on ? (id ?? -1) : null;
+    onChange(on ? 1 : leftRef.current !== null ? -1 : 0);
   }, [onChange]);
 
-  const handleRight = useCallback((active: boolean, identifier?: number) => {
-    if (active) {
-      rightTouchId.current = identifier ?? -1;
-      onChange(1);
-    } else {
-      rightTouchId.current = null;
-      if (leftTouchId.current === null) onChange(0);
-    }
-  }, [onChange]);
-
-  const isLeft = value < -0.1;
-  const isRight = value > 0.1;
-
-  const btnBase: React.CSSProperties = {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    fontSize: 22,
-    fontWeight: 'bold',
-    border: 'none',
-    cursor: 'pointer',
-    touchAction: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    userSelect: 'none',
-    WebkitUserSelect: 'none',
-  };
+  const btnStyle = (active: boolean): React.CSSProperties => ({
+    width: 52, height: 52, borderRadius: 14,
+    fontSize: 20, fontWeight: 700,
+    background: active ? '#1565c0' : '#e8eaf6',
+    color: active ? 'white' : '#5c6bc0',
+    border: active ? '2px solid #0d47a1' : '2px solid #c5cae9',
+    cursor: 'pointer', touchAction: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transform: active ? 'scale(1.07)' : 'scale(1)',
+    transition: 'all 0.07s',
+    boxShadow: active ? '0 4px 12px #1565c040' : 'none',
+  });
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-[10px] font-bold text-white/40">STEER</span>
-      <div className="flex items-center gap-2">
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <span style={{ fontSize: 9, fontWeight: 700, color: '#aaa', letterSpacing: 1 }}>STEER</span>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <button
-          style={{
-            ...btnBase,
-            background: isLeft ? '#22d3ee' : 'rgba(255,255,255,0.08)',
-            boxShadow: isLeft ? '0 0 16px #22d3ee60' : 'none',
-            transform: isLeft ? 'scale(1.08)' : 'scale(1)',
-            transition: 'all 0.07s',
-          }}
-          onTouchStart={(e) => { e.preventDefault(); handleLeft(true, e.changedTouches[0].identifier); }}
-          onTouchEnd={(e) => { e.preventDefault(); handleLeft(false); }}
-          onTouchCancel={(e) => { e.preventDefault(); handleLeft(false); }}
-          onMouseDown={() => handleLeft(true)}
-          onMouseUp={() => handleLeft(false)}
-          onMouseLeave={() => handleLeft(false)}
-        >
-          ◀
-        </button>
-
-        {/* Center indicator */}
-        <div
-          className="flex flex-col items-center justify-center rounded-xl"
-          style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.04)' }}
-        >
-          <div
-            style={{
-              width: 24,
-              height: 3,
-              borderRadius: 2,
-              background: '#ffffff20',
-              position: 'relative',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: value === 0 ? '#ffffff40' : '#22d3ee',
-                top: -2.5,
-                left: `${(value + 1) / 2 * 16}px`,
-                transition: 'left 0.05s',
-                boxShadow: value !== 0 ? '0 0 6px #22d3ee' : 'none',
-              }}
-            />
-          </div>
-        </div>
-
+          style={btnStyle(value < -0.1)}
+          onTouchStart={(e) => { e.preventDefault(); L(true, e.changedTouches[0].identifier); }}
+          onTouchEnd={() => L(false)}
+          onTouchCancel={() => L(false)}
+          onMouseDown={() => L(true)}
+          onMouseUp={() => L(false)}
+          onMouseLeave={() => L(false)}
+        >◀</button>
+        <div style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: '#f5f5f5', border: '2px solid #e0e0e0',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16,
+        }}>🚗</div>
         <button
-          style={{
-            ...btnBase,
-            background: isRight ? '#22d3ee' : 'rgba(255,255,255,0.08)',
-            boxShadow: isRight ? '0 0 16px #22d3ee60' : 'none',
-            transform: isRight ? 'scale(1.08)' : 'scale(1)',
-            transition: 'all 0.07s',
-          }}
-          onTouchStart={(e) => { e.preventDefault(); handleRight(true, e.changedTouches[0].identifier); }}
-          onTouchEnd={(e) => { e.preventDefault(); handleRight(false); }}
-          onTouchCancel={(e) => { e.preventDefault(); handleRight(false); }}
-          onMouseDown={() => handleRight(true)}
-          onMouseUp={() => handleRight(false)}
-          onMouseLeave={() => handleRight(false)}
-        >
-          ▶
-        </button>
+          style={btnStyle(value > 0.1)}
+          onTouchStart={(e) => { e.preventDefault(); R(true, e.changedTouches[0].identifier); }}
+          onTouchEnd={() => R(false)}
+          onTouchCancel={() => R(false)}
+          onMouseDown={() => R(true)}
+          onMouseUp={() => R(false)}
+          onMouseLeave={() => R(false)}
+        >▶</button>
       </div>
     </div>
   );
 }
 
 // ─── Gear Shifter ─────────────────────────────────────────────────────────────
-
-interface GearShifterProps {
-  currentGear: number;
-  onGearChange: (g: number) => void;
-  clutchPressed: boolean;
-}
-
-function GearShifter({ currentGear, onGearChange, clutchPressed }: GearShifterProps) {
+function GearShifter({ currentGear, onGearChange, clutchPressed }: {
+  currentGear: number; onGearChange: (g: number) => void; clutchPressed: boolean;
+}) {
   const [flash, setFlash] = useState(false);
+
+  const tap = useCallback((g: number) => {
+    if (!clutchPressed) {
+      setFlash(true); setTimeout(() => setFlash(false), 350);
+      if ('vibrate' in navigator) navigator.vibrate(40);
+      return;
+    }
+    onGearChange(g);
+  }, [clutchPressed, onGearChange]);
 
   const gears = [
     { g: 1, label: '1', col: 1, row: 1 },
@@ -471,87 +308,56 @@ function GearShifter({ currentGear, onGearChange, clutchPressed }: GearShifterPr
     { g: 0, label: 'N', col: 3, row: 2 },
   ];
 
-  const handleGearTap = useCallback((g: number) => {
-    if (!clutchPressed) {
-      setFlash(true);
-      setTimeout(() => setFlash(false), 400);
-      if ('vibrate' in navigator) navigator.vibrate(50);
-      return;
-    }
-    onGearChange(g);
-  }, [clutchPressed, onGearChange]);
-
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-[10px] font-bold text-white/40">GEARS</span>
-      <div
-        className="rounded-xl p-1.5"
-        style={{
-          background: flash ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)',
-          border: `1.5px solid ${flash ? '#ef4444' : 'rgba(255,255,255,0.1)'}`,
-          transition: 'all 0.1s',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 4,
-        }}
-      >
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <span style={{ fontSize: 9, fontWeight: 700, color: '#aaa', letterSpacing: 1 }}>GEARS</span>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 4,
+        padding: 6,
+        borderRadius: 12,
+        background: flash ? '#fdecea' : '#f5f5f5',
+        border: `2px solid ${flash ? '#ef9a9a' : '#e0e0e0'}`,
+        transition: 'all 0.1s',
+      }}>
         {gears.map(({ g, label, col, row }) => {
-          const isActive = currentGear === g;
-          const gColor = g === 0 ? '#f59e0b' : '#4ade80';
+          const active = currentGear === g;
+          const gc = g === 0 ? '#f57c00' : '#2e7d32';
           return (
             <button
               key={g}
-              onTouchStart={(e) => { e.preventDefault(); handleGearTap(g); }}
-              onClick={() => handleGearTap(g)}
+              onTouchStart={(e) => { e.preventDefault(); tap(g); }}
+              onClick={() => tap(g)}
               style={{
-                gridColumn: col,
-                gridRow: row,
-                width: 38,
-                height: 34,
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 'bold',
-                fontFamily: 'monospace',
-                background: isActive ? gColor : 'rgba(255,255,255,0.06)',
-                color: isActive ? '#000' : clutchPressed ? '#fff' : '#ffffff50',
-                border: isActive ? `2px solid ${gColor}` : '1.5px solid rgba(255,255,255,0.08)',
-                cursor: 'pointer',
+                gridColumn: col, gridRow: row,
+                width: 36, height: 32,
+                borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: 'monospace',
+                background: active ? gc : 'white',
+                color: active ? 'white' : clutchPressed ? '#333' : '#ccc',
+                border: active ? `2px solid ${gc}` : '2px solid #e0e0e0',
+                cursor: 'pointer', touchAction: 'manipulation',
                 transition: 'all 0.1s',
-                boxShadow: isActive ? `0 0 10px ${gColor}60` : 'none',
-                touchAction: 'manipulation',
+                boxShadow: active ? `0 2px 8px ${gc}40` : 'none',
               }}
-            >
-              {label}
-            </button>
+            >{label}</button>
           );
         })}
       </div>
-      <span
-        className="text-[9px] font-semibold"
-        style={{ color: clutchPressed ? '#4ade80' : flash ? '#ef4444' : '#ffffff30' }}
-      >
-        {clutchPressed ? '✓ Clutch OK' : flash ? '⚠ Press clutch!' : 'Press clutch first'}
+      <span style={{ fontSize: 8, color: clutchPressed ? '#2e7d32' : flash ? '#c62828' : '#bbb', fontWeight: 600 }}>
+        {clutchPressed ? '✓ Ready' : flash ? '⚠ Press clutch!' : 'Press clutch first'}
       </span>
     </div>
   );
 }
 
 // ─── Main Controls ─────────────────────────────────────────────────────────────
-
 interface ControlsProps {
-  clutch: number;
-  brake: number;
-  throttle: number;
-  steering: number;
-  gear: number;
-  onClutch: (v: number) => void;
-  onBrake: (v: number) => void;
-  onThrottle: (v: number) => void;
-  onSteering: (v: number) => void;
-  onGear: (g: number) => void;
-  onStart: () => void;
-  engineOn: boolean;
-  isStalled: boolean;
+  clutch: number; brake: number; throttle: number; steering: number; gear: number;
+  onClutch: (v: number) => void; onBrake: (v: number) => void;
+  onThrottle: (v: number) => void; onSteering: (v: number) => void;
+  onGear: (g: number) => void; onStart: () => void;
+  engineOn: boolean; isStalled: boolean;
 }
 
 export function Controls({
@@ -562,78 +368,57 @@ export function Controls({
   const clutchPressed = clutch > 65;
 
   return (
-    <div
-      style={{
-        background: 'rgba(8,12,20,0.96)',
-        backdropFilter: 'blur(16px)',
-        borderTop: '1px solid rgba(255,255,255,0.08)',
-        padding: '8px 8px 10px',
-        display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'space-between',
-        gap: 6,
-      }}
-    >
+    <div style={{
+      background: 'white',
+      borderTop: '1px solid #e8e8e8',
+      padding: '8px 10px 10px',
+      display: 'flex',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      gap: 6,
+    }}>
       {/* LEFT: 3 pedals */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5 }}>
         <ClutchPedal value={clutch} onChange={onClutch} />
-        <SliderPedal label="BRAKE" value={brake} onChange={onBrake} color="#ef4444" icon="🛑" releaseToZero={true} />
-        <SliderPedal label="GAS" value={throttle} onChange={onThrottle} color="#4ade80" icon="⛽" releaseToZero={true} />
+        <SliderPedal label="BRAKE" value={brake} onChange={onBrake} color="#e53935" icon="🛑" />
+        <SliderPedal label="GAS"   value={throttle} onChange={onThrottle} color="#43a047" icon="⛽" />
       </div>
 
-      {/* CENTER: Start button + Steering */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-        {/* Always show start/restart state */}
+      {/* CENTER: engine status + steering */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
         {(!engineOn || isStalled) ? (
           <button
             onTouchStart={(e) => { e.preventDefault(); onStart(); }}
             onClick={onStart}
             style={{
-              width: 58,
-              height: 58,
-              borderRadius: '50%',
-              background: isStalled ? '#dc2626' : '#16a34a',
-              color: 'white',
-              fontWeight: 'bold',
-              fontSize: 10,
-              border: 'none',
-              cursor: 'pointer',
-              boxShadow: `0 0 20px ${isStalled ? '#dc262680' : '#16a34a80'}`,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 1,
-              touchAction: 'manipulation',
-              lineHeight: 1,
+              width: 56, height: 56, borderRadius: '50%',
+              background: isStalled ? '#c62828' : '#2e7d32',
+              color: 'white', fontWeight: 700, fontSize: 10,
+              border: 'none', cursor: 'pointer',
+              boxShadow: `0 4px 16px ${isStalled ? '#c6282860' : '#2e7d3260'}`,
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              gap: 1, lineHeight: 1, touchAction: 'manipulation',
             }}
           >
-            <span style={{ fontSize: 18 }}>{isStalled ? '🔁' : '▶'}</span>
+            <span style={{ fontSize: 20 }}>{isStalled ? '🔁' : '▶'}</span>
             <span>{isStalled ? 'RESTART' : 'START'}</span>
           </button>
         ) : (
-          <div
-            style={{
-              width: 58,
-              height: 58,
-              borderRadius: '50%',
-              background: 'rgba(22,163,74,0.12)',
-              border: '2px solid #16a34a40',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 1,
-            }}
-          >
-            <span style={{ fontSize: 14 }}>🟢</span>
-            <span style={{ fontSize: 8, color: '#16a34a', fontWeight: 'bold' }}>ON</span>
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%',
+            background: '#e8f5e9', border: '2px solid #a5d6a7',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 1,
+          }}>
+            <span style={{ fontSize: 16 }}>🟢</span>
+            <span style={{ fontSize: 8, color: '#2e7d32', fontWeight: 700 }}>ON</span>
           </div>
         )}
         <SteeringControls value={steering} onChange={onSteering} />
       </div>
 
-      {/* RIGHT: Gear shifter */}
+      {/* RIGHT: gear shifter */}
       <GearShifter currentGear={gear} onGearChange={onGear} clutchPressed={clutchPressed} />
     </div>
   );

@@ -9,11 +9,7 @@ import { InstructorFeedback, LessonOverlay } from './Instructor';
 import { SkillsDashboard } from './SkillsDashboard';
 
 const SLOPE_BY_PHASE: Record<GamePhase, number> = {
-  menu: 0,
-  lesson_1: 0,
-  stall_challenge: 0.4,
-  free_drive: 0,
-  skills: 0,
+  menu: 0, lesson_1: 0, stall_challenge: 0.4, free_drive: 0, skills: 0,
 };
 
 export function GameScreen({ phase }: { phase: GamePhase }) {
@@ -29,18 +25,14 @@ export function GameScreen({ phase }: { phase: GamePhase }) {
   const rafRef = useRef<number>(0);
   const audioInitRef = useRef(false);
 
-  // Game loop
   const gameLoop = useCallback((timestamp: number) => {
     if (lastTimeRef.current === 0) lastTimeRef.current = timestamp;
     const dt = Math.min((timestamp - lastTimeRef.current) / 1000, 0.05);
     lastTimeRef.current = timestamp;
-
-    const slope = SLOPE_BY_PHASE[phase] || 0;
-    tickPhysics(dt, slope);
+    tickPhysics(dt, SLOPE_BY_PHASE[phase] || 0);
     tickSession(dt);
     updateSkills();
     clearOldMessages();
-
     rafRef.current = requestAnimationFrame(gameLoop);
   }, [tickPhysics, tickSession, updateSkills, clearOldMessages, phase]);
 
@@ -51,7 +43,6 @@ export function GameScreen({ phase }: { phase: GamePhase }) {
     return () => cancelAnimationFrame(rafRef.current);
   }, [phase, gameLoop]);
 
-  // Init audio on first interaction
   const initAudio = useCallback(async () => {
     if (audioInitRef.current) return;
     audioInitRef.current = true;
@@ -63,20 +54,19 @@ export function GameScreen({ phase }: { phase: GamePhase }) {
   // Lesson progression
   useEffect(() => {
     if (phase !== 'lesson_1') return;
-
     if (lessonStep === 0 && car.engineOn) {
       setLessonStep(1);
       addMessage('Engine started! Now select 1st gear.', 'success');
     }
     if (lessonStep === 1 && car.gear === 1) {
       setLessonStep(2);
-      addMessage('1st gear engaged! Now slowly release the clutch.', 'success');
+      addMessage('Great! Now slowly release the clutch.', 'success');
     }
     if (lessonStep === 2 && car.clutchEngagement > 0.1) {
       setLessonStep(3);
     }
     if (lessonStep === 3 && car.speed > 3) {
-      addMessage('You\'re moving! Great clutch control! 🎉', 'success');
+      addMessage("You're moving! Amazing clutch control! 🎉", 'success');
       setLessonStep(4);
     }
   }, [car, lessonStep, phase, setLessonStep, addMessage]);
@@ -95,12 +85,69 @@ export function GameScreen({ phase }: { phase: GamePhase }) {
 
   return (
     <div
-      className="absolute inset-0 flex flex-col"
       onTouchStart={initAudio}
-      onClick={initAudio}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        height: '100dvh',
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#e8f0e8',
+        overflow: 'hidden',
+      }}
     >
-      {/* Game world */}
-      <div className="relative flex-1 overflow-hidden">
+      {/* ── TOP BAR ── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 12px',
+        background: 'white',
+        borderBottom: '1px solid #e0e0e0',
+        flexShrink: 0,
+        zIndex: 10,
+      }}>
+        <button
+          onClick={() => setPhase('menu')}
+          style={{
+            background: '#f0f0f0',
+            border: 'none',
+            borderRadius: 20,
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 600,
+            color: '#333',
+            cursor: 'pointer',
+          }}
+        >← Menu</button>
+
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>
+          {phase === 'lesson_1' ? '🅿️ Parking Lot' :
+           phase === 'stall_challenge' ? '⛰️ Hill Start' : '🏙️ Free Drive'}
+        </span>
+
+        <button
+          onClick={() => setPhase('skills')}
+          style={{
+            background: '#e8f5e9',
+            border: 'none',
+            borderRadius: 20,
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 600,
+            color: '#2e7d32',
+            cursor: 'pointer',
+          }}
+        >📊 Skills</button>
+      </div>
+
+      {/* ── LESSON CARD (compact, above canvas) ── */}
+      {(phase === 'lesson_1' || phase === 'stall_challenge') && (
+        <LessonOverlay step={lessonStep} phase={phase} />
+      )}
+
+      {/* ── GAME WORLD (canvas fills remaining space) ── */}
+      <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
         <GameCanvas
           carX={car.x}
           carY={car.y}
@@ -109,67 +156,44 @@ export function GameScreen({ phase }: { phase: GamePhase }) {
           speed={car.speed}
           phase={phase}
         />
-
-        {/* Instructor feedback bubbles */}
+        {/* Instructor bubble overlaid on canvas */}
         <InstructorFeedback messages={messages} />
-
-        {/* Lesson card */}
-        {(phase === 'lesson_1' || phase === 'stall_challenge') && (
-          <LessonOverlay step={lessonStep} phase={phase} />
-        )}
-
-        {/* Top HUD */}
-        <div className="absolute top-3 left-3 right-3">
-          <div className="flex items-start justify-between">
-            {/* Back button */}
-            <button
-              onClick={() => setPhase('menu')}
-              className="rounded-full px-3 py-1.5 text-[11px] font-semibold text-white/60"
-              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
-            >
-              ← Menu
-            </button>
-
-            {/* Skills shortcut */}
-            <button
-              onClick={() => setPhase('skills')}
-              className="rounded-full px-3 py-1.5 text-[11px] font-semibold"
-              style={{
-                background: 'rgba(0,0,0,0.6)',
-                backdropFilter: 'blur(8px)',
-                color: '#22d3ee',
-              }}
-            >
-              📊 Skills
-            </button>
-          </div>
-        </div>
-
-
       </div>
 
-      {/* Gauges */}
-      <div className="flex justify-center px-3 py-2"
-        style={{ background: 'rgba(0,0,0,0.85)' }}>
+      {/* ── GAUGES BAR ── */}
+      <div style={{
+        background: 'white',
+        borderTop: '1px solid #e8e8e8',
+        borderBottom: '1px solid #e8e8e8',
+        padding: '6px 12px',
+        display: 'flex',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}>
         <Gauges car={car} />
       </div>
 
-      {/* Controls */}
-      <Controls
-        clutch={inputs.clutch}
-        brake={inputs.brake}
-        throttle={inputs.throttle}
-        steering={inputs.steering}
-        gear={inputs.gear}
-        onClutch={(v) => updateInputs({ clutch: v })}
-        onBrake={(v) => updateInputs({ brake: v })}
-        onThrottle={(v) => updateInputs({ throttle: v })}
-        onSteering={(v) => updateInputs({ steering: v })}
-        onGear={(g) => updateInputs({ gear: g })}
-        onStart={() => { updateInputs({ startEngine: true }); setTimeout(() => updateInputs({ startEngine: false }), 150); }}
-        engineOn={car.engineOn}
-        isStalled={car.isStalled}
-      />
+      {/* ── CONTROLS ── */}
+      <div style={{ flexShrink: 0 }}>
+        <Controls
+          clutch={inputs.clutch}
+          brake={inputs.brake}
+          throttle={inputs.throttle}
+          steering={inputs.steering}
+          gear={inputs.gear}
+          onClutch={(v) => updateInputs({ clutch: v })}
+          onBrake={(v) => updateInputs({ brake: v })}
+          onThrottle={(v) => updateInputs({ throttle: v })}
+          onSteering={(v) => updateInputs({ steering: v })}
+          onGear={(g) => updateInputs({ gear: g })}
+          onStart={() => {
+            updateInputs({ startEngine: true });
+            setTimeout(() => updateInputs({ startEngine: false }), 150);
+          }}
+          engineOn={car.engineOn}
+          isStalled={car.isStalled}
+        />
+      </div>
     </div>
   );
 }

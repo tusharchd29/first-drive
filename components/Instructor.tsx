@@ -1,128 +1,100 @@
 'use client';
-
 import React, { useEffect, useState } from 'react';
 import { InstructorMessage } from '../lib/gameStore';
 
-interface InstructorProps {
-  messages: InstructorMessage[];
-}
-
-const TYPE_COLORS = {
-  tip: { bg: '#1e3a5f', border: '#3b82f6', icon: '💡' },
-  warning: { bg: '#3b1f1f', border: '#ef4444', icon: '⚠️' },
-  success: { bg: '#1a3a2a', border: '#22c55e', icon: '✅' },
-};
-
-export function InstructorFeedback({ messages }: InstructorProps) {
-  const [visible, setVisible] = useState<InstructorMessage[]>([]);
+export function InstructorFeedback({ messages }: { messages: InstructorMessage[] }) {
+  const [visible, setVisible] = useState<InstructorMessage | null>(null);
 
   useEffect(() => {
-    setVisible(messages.slice(0, 2));
-    const timer = setTimeout(() => {
-      setVisible([]);
-    }, 4000);
-    return () => clearTimeout(timer);
+    if (messages.length === 0) return;
+    setVisible(messages[0]);
+    const t = setTimeout(() => setVisible(null), 3500);
+    return () => clearTimeout(t);
   }, [messages]);
 
-  if (visible.length === 0) return null;
+  if (!visible) return null;
 
-  const latest = visible[0];
-  const style = TYPE_COLORS[latest.type];
+  const isWarning = visible.type === 'warning';
+  const isSuccess = visible.type === 'success';
 
   return (
     <div
-      className="absolute left-3 right-3 animate-slideUp"
-      style={{ top: 70 }}
+      className="animate-instructorPop"
+      style={{
+        position: 'absolute',
+        bottom: 12, left: 10, right: 10,
+        zIndex: 20,
+        background: isWarning ? '#fff3e0' : isSuccess ? '#e8f5e9' : '#e3f2fd',
+        border: `1.5px solid ${isWarning ? '#ffb74d' : isSuccess ? '#81c784' : '#64b5f6'}`,
+        borderRadius: 14,
+        padding: '8px 12px',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 8,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+      }}
     >
-      <div
-        className="flex items-start gap-2 rounded-2xl px-3 py-2"
-        style={{
-          background: style.bg,
-          border: `1px solid ${style.border}40`,
-          backdropFilter: 'blur(8px)',
-          boxShadow: `0 4px 20px rgba(0,0,0,0.4)`,
-        }}
-      >
-        {/* Instructor avatar */}
-        <div className="instructor-bounce flex-shrink-0 text-2xl">🧑‍🏫</div>
-        <div className="flex-1">
-          <span className="text-[11px] font-semibold text-white/90 leading-snug">
-            {style.icon} {latest.text}
-          </span>
-        </div>
-      </div>
+      <span style={{ fontSize: 20, flexShrink: 0 }}>🧑‍🏫</span>
+      <span style={{
+        fontSize: 12, fontWeight: 600, lineHeight: 1.4,
+        color: isWarning ? '#e65100' : isSuccess ? '#1b5e20' : '#0d47a1',
+      }}>
+        {isWarning ? '⚠ ' : isSuccess ? '✅ ' : '💡 '}{visible.text}
+      </span>
     </div>
   );
 }
 
-interface LessonCardProps {
-  step: number;
-  phase: string;
-}
-
-const LESSONS: Record<string, { steps: { title: string; desc: string; hint?: string }[] }> = {
+const LESSONS: Record<string, { steps: { title: string; desc: string; hint: string }[] }> = {
   lesson_1: {
     steps: [
-      {
-        title: 'Start the Engine',
-        desc: 'Press the green START button. Make sure clutch is fully pressed first.',
-        hint: '🦶 Clutch pedal must be at top',
-      },
-      {
-        title: 'Find 1st Gear',
-        desc: 'With clutch pressed, tap the "1" on the gear shifter.',
-        hint: '⚙️ Clutch > 70% to change gears',
-      },
-      {
-        title: 'Find the Bite Point',
-        desc: 'Slowly slide your finger DOWN on the clutch. When it vibrates — STOP. That\'s the bite point.',
-        hint: '⚡ Watch the yellow BITE indicator',
-      },
-      {
-        title: 'Move the Car',
-        desc: 'Add a little gas while slowly releasing the clutch through the bite zone.',
-        hint: '🔑 Clutch + Gas coordination is everything',
-      },
+      { title: 'Start the Engine', desc: 'Press the green START button. Clutch must be fully pressed.', hint: '🦶 Clutch pedal drag to top = pressed' },
+      { title: 'Find 1st Gear', desc: 'With clutch pressed (✓ Ready shown), tap gear "1".', hint: '⚙ Clutch > 70% to change gears' },
+      { title: 'Find the Bite Point', desc: 'Slowly drag the clutch DOWN. When you see ✦ BITE — hold it there.', hint: '⚡ Watch the orange BITE indicator' },
+      { title: 'Move the Car!', desc: 'Add gas while slowly releasing clutch through the bite zone.', hint: '🔑 Clutch + Gas together is the key' },
     ],
   },
   stall_challenge: {
     steps: [
-      {
-        title: 'Hill Start',
-        desc: 'The car is on a slope. Use handbrake + clutch + gas together.',
-        hint: '⛰️ Hold handbrake until you feel drive',
-      },
+      { title: 'Hill Start', desc: 'You\'re on a slope. Hold clutch in bite zone, add gas, then slowly release.', hint: '⛰ Add more gas than flat ground' },
     ],
   },
 };
 
-export function LessonOverlay({ step, phase }: LessonCardProps) {
+export function LessonOverlay({ step, phase }: { step: number; phase: string }) {
   const lesson = LESSONS[phase];
   if (!lesson || step >= lesson.steps.length) return null;
-
-  const current = lesson.steps[step];
+  const cur = lesson.steps[step];
+  const total = lesson.steps.length;
 
   return (
-    <div
-      className="absolute left-3 right-3 rounded-2xl p-3 animate-fadeIn"
-      style={{
-        bottom: 310,
-        background: 'rgba(10,10,20,0.92)',
-        border: '1px solid rgba(255,255,255,0.12)',
-        backdropFilter: 'blur(12px)',
-      }}
-    >
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-[10px] font-bold text-[#22d3ee] tracking-widest uppercase">
-          Step {step + 1} of {lesson.steps.length}
-        </span>
-        <div className="flex-1 h-px bg-white/10" />
+    <div style={{
+      background: 'white',
+      borderBottom: '1px solid #e0e0e0',
+      padding: '8px 14px',
+      flexShrink: 0,
+    }}>
+      {/* Progress dots */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <div key={i} style={{
+            width: i === step ? 18 : 6, height: 6, borderRadius: 3,
+            background: i < step ? '#2e7d32' : i === step ? '#1565c0' : '#e0e0e0',
+            transition: 'all 0.3s',
+          }} />
+        ))}
+        <span style={{ fontSize: 10, color: '#999', marginLeft: 2 }}>Step {step + 1}/{total}</span>
       </div>
-      <p className="text-white font-semibold text-[13px] mb-1">{current.title}</p>
-      <p className="text-white/60 text-[11px] leading-snug">{current.desc}</p>
-      {current.hint && (
-        <p className="text-[#f59e0b] text-[10px] mt-1 font-medium">{current.hint}</p>
-      )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>{cur.title}</div>
+          <div style={{ fontSize: 11, color: '#555', marginTop: 1 }}>{cur.desc}</div>
+        </div>
+        <div style={{
+          background: '#fff8e1', borderRadius: 8, padding: '4px 8px',
+          fontSize: 10, color: '#e65100', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
+        }}>{cur.hint}</div>
+      </div>
     </div>
   );
 }

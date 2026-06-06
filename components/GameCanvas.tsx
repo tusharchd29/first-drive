@@ -19,14 +19,13 @@ interface GameCanvasProps {
   phase: GamePhase;
 }
 
-export function GameCanvas({
-  carX, carY, carAngle, isStalled, speed, phase
-}: GameCanvasProps) {
+export function GameCanvas({ carX, carY, carAngle, isStalled, speed, phase }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<RoadSegment[]>([]);
   const animRef = useRef<number>(0);
+  // Store CSS dimensions separately from canvas pixel dimensions
+  const cssSize = useRef({ w: 0, h: 0 });
 
-  // Build world based on phase
   useEffect(() => {
     if (phase === 'lesson_1' || phase === 'stall_challenge') {
       worldRef.current = buildParkingLotWorld();
@@ -41,49 +40,49 @@ export function GameCanvas({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const W = canvas.width;
-    const H = canvas.height;
+    // Always use CSS dimensions for game logic (camera, positions)
+    const W = cssSize.current.w;
+    const H = cssSize.current.h;
+    if (W === 0 || H === 0) return;
 
-    // Camera follows car (centered)
+    // Clear full pixel buffer
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Scale for retina, then use CSS coords for everything
+    ctx.save();
+    const dpr = window.devicePixelRatio || 1;
+    ctx.scale(dpr, dpr);
+
+    // Fill background first so it's never black
+    ctx.fillStyle = '#5a8a5a';
+    ctx.fillRect(0, 0, W, H);
+
+    // Camera centres on car using CSS coords
     const camX = carX - W / 2;
     const camY = carY - H / 2;
 
-    ctx.clearRect(0, 0, W, H);
-
-    // Render world
     renderWorld(ctx, worldRef.current, camX, camY);
-
-    // Render car
     renderCar(ctx, carX, carY, carAngle, camX, camY, isStalled, speed);
 
-    // Lesson 1: Show target zone indicator
+    // Target zone for lesson 1
     if (phase === 'lesson_1') {
-      // Draw a gentle "drive here" zone
       ctx.save();
       ctx.translate(350 - camX, 300 - camY);
-      ctx.strokeStyle = '#22d3ee40';
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
       ctx.lineWidth = 2;
       ctx.setLineDash([8, 8]);
       ctx.strokeRect(-60, -30, 120, 60);
-      ctx.fillStyle = '#22d3ee10';
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
       ctx.fillRect(-60, -30, 120, 60);
-      ctx.fillStyle = '#22d3ee80';
-      ctx.font = '10px sans-serif';
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#1a1a1a';
+      ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Drive here', 0, 5);
+      ctx.fillText('🎯 Drive here', 0, 5);
       ctx.restore();
     }
 
-    // Stall challenge: Draw slope indicator
-    if (phase === 'stall_challenge') {
-      ctx.save();
-      ctx.translate(W / 2, H / 2 - 60);
-      ctx.fillStyle = '#f59e0b';
-      ctx.font = 'bold 12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⛰️ Uphill slope active', 0, 0);
-      ctx.restore();
-    }
+    ctx.restore();
   }, [carX, carY, carAngle, isStalled, speed, phase]);
 
   useEffect(() => {
@@ -91,14 +90,19 @@ export function GameCanvas({
     if (!canvas) return;
 
     const resize = () => {
-      canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-      canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      if (w === 0 || h === 0) return;
+      cssSize.current = { w, h };
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
     };
 
+    // Use ResizeObserver for reliable sizing
+    const ro = new ResizeObserver(() => resize());
+    ro.observe(canvas);
     resize();
-    window.addEventListener('resize', resize);
 
     const loop = () => {
       draw();
@@ -107,7 +111,7 @@ export function GameCanvas({
     animRef.current = requestAnimationFrame(loop);
 
     return () => {
-      window.removeEventListener('resize', resize);
+      ro.disconnect();
       cancelAnimationFrame(animRef.current);
     };
   }, [draw]);
@@ -115,8 +119,7 @@ export function GameCanvas({
   return (
     <canvas
       ref={canvasRef}
-      className="w-full h-full block"
-      style={{ touchAction: 'none' }}
+      style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
     />
   );
 }
