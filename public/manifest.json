@@ -1,0 +1,11 @@
+{
+  "name": "First Drive",
+  "short_name": "First Drive",
+  "description": "Learn manual car driving",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#080c14",
+  "theme_color": "#080c14",
+  "icons": []
+}
